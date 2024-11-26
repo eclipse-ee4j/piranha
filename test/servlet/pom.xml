@@ -33,6 +33,7 @@
         <module>crac</module>
         <module>hello</module>
         <module>helloworld</module>
+        <module>integration</module>
         <module>pages</module>
         <module>websocket</module>
     </modules>
