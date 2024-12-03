@@ -27,30 +27,14 @@
  */
 package cloud.piranha.test.coreprofile.distribution;
 
-import org.junit.jupiter.api.Test;
+import jakarta.ws.rs.HttpMethod;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-
-public class ProducesIT extends ITBase {
-
-    @Test
-    public void notAcceptable() throws Exception {
-        HttpClient client = HttpClient.newHttpClient();
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + "/produces/notAcceptable"))
-                .header("Accept", "text/xml")
-                .GET()
-                .build();
-
-        HttpResponse<String> response = client.send(request,
-                HttpResponse.BodyHandlers.ofString());
-
-        assertEquals(406, response.statusCode());
-        assertNotEquals("This should not show up!", response.body());
-    }
+@Target(METHOD)
+@Retention(RUNTIME)
+@HttpMethod("TRACE")
+public @interface TRACE {
 }

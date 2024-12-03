@@ -27,30 +27,33 @@
  */
 package cloud.piranha.test.coreprofile.distribution;
 
-import org.junit.jupiter.api.Test;
-
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
 
-public class ProducesIT extends ITBase {
+/**
+ * The integration tests validating Json Processing integration.
+ *
+ * @author Manfred Riem (mriem@manorrock.com)
+ */
+public class JsonProcessingIT extends ITBase {
 
+    /**
+     * Test JSON Processing.
+     *
+     * @throws Exception when a serious error occurs.
+     */
     @Test
-    public void notAcceptable() throws Exception {
+    void testJsonProcessing() throws Exception {
         HttpClient client = HttpClient.newHttpClient();
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + "/produces/notAcceptable"))
-                .header("Accept", "text/xml")
-                .GET()
+        HttpRequest request = HttpRequest
+                .newBuilder(new URI(baseUrl + "/jsonp"))
+                .POST(HttpRequest.BodyPublishers.ofString("\"JSON Processing works!\""))
                 .build();
-
-        HttpResponse<String> response = client.send(request,
-                HttpResponse.BodyHandlers.ofString());
-
-        assertEquals(406, response.statusCode());
-        assertNotEquals("This should not show up!", response.body());
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        assertTrue(response.body().contains("{\"string\":\"JSON Processing works!\"}"));
     }
 }
