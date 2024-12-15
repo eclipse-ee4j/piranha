@@ -27,82 +27,55 @@
  */
 package cloud.piranha.test.coreprofile.distribution;
 
-import jakarta.inject.Inject;
-import jakarta.ws.rs.GET;
-import jakarta.ws.rs.POST;
-import jakarta.ws.rs.Path;
-import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.WebApplicationException;
+import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.ws.rs.core.Context;
-import static jakarta.ws.rs.core.MediaType.SERVER_SENT_EVENTS;
 import jakarta.ws.rs.sse.OutboundSseEvent;
 import jakarta.ws.rs.sse.Sse;
 import jakarta.ws.rs.sse.SseEventSink;
-import java.io.IOException;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * The bean to test the Server Side Event (SSE) integration works.
+ * The single and one and only SSE broadcast bean.
  *
  * @author Manfred Riem (mriem@manorrock.com)
  */
-@Path("/sse")
-public class SseBean {
+@ApplicationScoped
+public class SseBroadcastBean {
 
     /**
-     * Stores the broadcaster.
+     * List of SSE event sinks.
      */
-    @Inject
-    private SseBroadcastBean broadcastBean;
+    private final List<SseEventSink> sinks = new CopyOnWriteArrayList<>();
 
     /**
-     * Stores the SSE context.
+     * Store the SSE.
      */
     @Context
     private Sse sse;
 
     /**
-     * Test string based SSE.
+     * Register the given SSE event sink.
      *
-     * @param eventSink the event sink.
+     * @param sink the SSE event sink.
      */
-    @Path("string")
-    @GET
-    @Produces(SERVER_SENT_EVENTS)
-    public void string(@Context SseEventSink eventSink) {
-        new Thread(() -> {
-            try (SseEventSink sink = eventSink; eventSink) {
-                for (int i = 0; i < 5; i++) {
-                    Thread.sleep(1000);
-                    OutboundSseEvent event = sse.newEventBuilder().
-                            name("string").
-                            data(String.class, "Event " + i).build();
-                    sink.send(event);
-                }
-            } catch (InterruptedException | IOException e) {
-                throw new WebApplicationException(e);
-            }
-        }).start();
+    public void register(SseEventSink sink) {
+        sinks.add(sink);
     }
 
     /**
-     * Perform a SSE Broadcast.
-     * 
-     * @param message the message to broadcast.
+     * Broadcast the given message 10 times.
+     *
+     * @param message the message.
      */
-    @Path("broadcast")
-    @POST
     public void broadcast(String message) {
-        broadcastBean.broadcast("Message");
-    }
-
-    /**
-     * Register to receive messages.
-     *
-     * @param eventSink the event sink.
-     */
-    @Path("register")
-    @GET
-    public void register(@Context SseEventSink eventSink) {
-        broadcastBean.register(eventSink);
+        for (int i = 1; i <= 10; i++) {
+            String eventMessage = message + " #" + i;
+            OutboundSseEvent event = sse.newEventBuilder()
+                    .name("message")
+                    .data(String.class, eventMessage)
+                    .build();
+            sinks.forEach(sink -> sink.send(event));
+        }
     }
 }
