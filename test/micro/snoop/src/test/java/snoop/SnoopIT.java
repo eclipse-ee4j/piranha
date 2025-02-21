@@ -31,12 +31,17 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.File;
+import java.time.Duration;
+
 import org.htmlunit.WebClient;
 import org.htmlunit.html.HtmlPage;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+
+import cloud.piranha.test.common.PiranhaStartup;
+import me.alexpanov.net.FreePortFinder;
 
 /**
  * The integration tests for the Snoop web application.
@@ -51,6 +56,11 @@ public class SnoopIT {
     private static int port;
 
     /**
+     * Stores the process.
+     */
+    private static Process process;
+
+    /**
      * Stores the web client.
      */
     private WebClient webClient;
@@ -60,7 +70,7 @@ public class SnoopIT {
      */
     @AfterAll
     public static void afterAll() {
-//        process.destroyForcibly();
+       process.destroyForcibly();
     }
 
     /**
@@ -78,7 +88,6 @@ public class SnoopIT {
      */
     @BeforeAll
     public static void beforeAll() throws Exception {
-        /*
         port = FreePortFinder.findFreeLocalPort();
         process = new ProcessBuilder()
                 .directory(new File("target"))
@@ -88,11 +97,12 @@ public class SnoopIT {
                         "--http-port",
                         String.valueOf(port),
                         "--war-file",
-                        "snoop.war")
+                        "snoop.war",
+                        "--verbose")
+                .inheritIO()
                 .start();
 
         PiranhaStartup.waitUntilPiranhaReady(process, port);
-        */
     }
 
     /**
@@ -108,9 +118,9 @@ public class SnoopIT {
      *
      * @throws Exception when a serious error occurs.
      */
-    @Disabled
     @Test
     public void testSnoop() throws Exception {
+        Thread.sleep(Duration.ofSeconds(5));
         HtmlPage page = webClient.getPage("http://localhost:" + port + "/Snoop");
         assertTrue(page.asXml().contains("Snoop"));
     }
