@@ -28,15 +28,23 @@
 package cloud.piranha.resource.impl;
 
 import cloud.piranha.resource.api.Resource;
+
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+
+import static java.lang.System.Logger.Level.INFO;
 import static java.lang.System.Logger.Level.WARNING;
+
 import java.net.URL;
-import java.util.Objects;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.jar.Attributes;
+import java.util.jar.JarFile;
 import java.util.jar.Manifest;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
 
 /**
  * A resource wrapper that loads the versioned entries from META-INF/versions if
@@ -95,18 +103,118 @@ public final class MultiReleaseResource implements Resource {
      *
      * @param resource the resource
      */
+    private final Map<Integer, Set<String>> versionedLocations = new ConcurrentHashMap<>();
+
     public MultiReleaseResource(Resource resource) {
         this.resource = resource;
         boolean isMultiReleaseTemp = false;
-        try ( InputStream resourceAsStream = resource.getResourceAsStream("META-INF/MANIFEST.MF")) {
+
+        // Leitura do MANIFEST.MF para determinar se é multi-release
+        try (InputStream resourceAsStream = resource.getResourceAsStream("META-INF/MANIFEST.MF")) {
             if (resourceAsStream != null) {
                 isMultiReleaseTemp = Boolean.parseBoolean(new Manifest(resourceAsStream).getMainAttributes().getValue(Attributes.Name.MULTI_RELEASE));
             }
         } catch (IOException ioe) {
             LOGGER.log(WARNING, "I/O error occurred while getting manifest for multi release resource", ioe);
         }
-        isMultiRelease = isMultiReleaseTemp;
+
+        this.isMultiRelease = isMultiReleaseTemp;
+
+        if (this.isMultiRelease) {
+            long startTime = System.currentTimeMillis();
+            LOGGER.log(INFO, "MRR: Tentando escaneamento rápido para recurso tipo: " + resource.getClass().getName());
+
+            JarFile jarFileToScan = null;
+            String resourceName = resource.getName();
+
+            // TENTATIVA 1: JarResource (retorna File, que precisa ser reaberto como JarFile)
+            if (resource instanceof JarResource jarResource) {
+                File file = jarResource.getJarFile();
+                if (file != null) {
+                    try {
+                        jarFileToScan = new JarFile(file);
+                        LOGGER.log(INFO, "MRR: JarResource encontrado. Usando JarFile nativo: " + resourceName);
+                    } catch (IOException e) {
+                        LOGGER.log(WARNING, "MRR: Falha ao reabrir JarFile de JarResource", file.getAbsolutePath(), e);
+                    }
+                }
+            }
+
+            // TENTATIVA 2: PrefixJarResource (retorna JarFile já aberto)
+            else if (resource instanceof PrefixJarResource prefixJarResource) {
+                jarFileToScan = prefixJarResource.getJarFile();
+                LOGGER.log(INFO, "MRR: PrefixJarResource encontrado. Usando JarFile pré-aberto: " + resourceName);
+            }
+
+            // EXECUTAR O SCAN RÁPIDO se jarFileToScan foi obtido com sucesso
+            if (jarFileToScan != null) {
+                try (Stream<String> locations = jarFileToScan.stream().map(ZipEntry::getName)) {
+                    locations.filter(location -> location.startsWith(META_INF_VERSIONS)).forEach(location -> {
+                        parseAndCacheLocation(location);
+                    });
+                }
+
+                // Fechar o JarFile se ele foi aberto localmente (JarResource)
+                if (resource instanceof JarResource) {
+                    try {
+                        jarFileToScan.close();
+                    } catch (IOException ignore) {} // Ignorar erro de fechamento
+                }
+
+                long endTime = System.currentTimeMillis();
+                LOGGER.log(INFO, "MRR: Escaneamento rápido concluído em " + (endTime - startTime) + " ms.");
+                return; // SUCESSO: Saia do construtor
+            }
+
+            // FALLBACK LENTO: Executar a varredura lenta e preencher o cache (se falhar o acesso rápido)
+            LOGGER.log(WARNING, "MRR: Falha ao otimizar. Usando getAllLocations() lento como fallback para " + resourceName);
+            resource.getAllLocations()
+                    .filter(location -> location.startsWith(META_INF_VERSIONS))
+                    .forEach(location -> {
+                        parseAndCacheLocation(location); // Chame a função de parsing
+                    });
+            long endTime = System.currentTimeMillis();
+            LOGGER.log(INFO, "MRR: Escaneamento lento concluído em " + (endTime - startTime) + " ms.");
+        }
     }
+
+    /**
+     * Parses a location string and adds it to the versionedLocations cache.
+     * @param location The path within the JAR (e.g., META-INF/versions/9/com/example/MyClass.class)
+     */
+    private void parseAndCacheLocation(String location) {
+        try {
+            String[] parts = location.split("/");
+            // parts[2] deve ser o número da versão (ex: 9, 10, 11)
+            if (parts.length >= 3) {
+                int version = Integer.parseInt(parts[2]);
+                // Garante que o índice não estoure se a string for muito curta
+                int baseLocationStart = META_INF_VERSIONS.length() + parts[2].length();
+                if (location.length() > baseLocationStart + 1) {
+                    String baseLocation = location.substring(baseLocationStart + 1);
+                    versionedLocations
+                            .computeIfAbsent(version, k -> ConcurrentHashMap.newKeySet())
+                            .add(baseLocation);
+                }
+            }
+        } catch (NumberFormatException e) {
+            LOGGER.log(WARNING, "Invalid version folder name found in multi-release: " + location, e);
+        }
+    }
+
+
+//    public MultiReleaseResource(Resource resource) {
+//        this.resource = resource;
+//        boolean isMultiReleaseTemp = false;
+//        try ( InputStream resourceAsStream = resource.getResourceAsStream("META-INF/MANIFEST.MF")) {
+//            if (resourceAsStream != null) {
+//                isMultiReleaseTemp = Boolean.parseBoolean(new Manifest(resourceAsStream).getMainAttributes().getValue(Attributes.Name.MULTI_RELEASE));
+//            }
+//        } catch (IOException ioe) {
+//            LOGGER.log(WARNING, "I/O error occurred while getting manifest for multi release resource", ioe);
+//        }
+//        isMultiRelease = isMultiReleaseTemp;
+//    }
 
     @Override
     public URL getResource(String location) {
@@ -128,16 +236,29 @@ public final class MultiReleaseResource implements Resource {
      * @return the URL of the versioned entry if present otherwise the base
      * entry
      */
+//    private URL versionedEntry(String location) {
+//        if (location.startsWith(META_INF)) {
+//            return resource.getResource(location);
+//        }
+//
+//        return IntStream.iterate(CURRENT_VERSION, version -> version > BASE_RELEASE_VERSION, version -> --version)
+//                .mapToObj(version -> resource.getResource(META_INF_VERSIONS + version + "/" + location))
+//                .filter(Objects::nonNull)
+//                .findFirst()
+//                .orElseGet(() -> resource.getResource(location));
+//    }
     private URL versionedEntry(String location) {
         if (location.startsWith(META_INF)) {
             return resource.getResource(location);
         }
+        for (int version = CURRENT_VERSION; version > BASE_RELEASE_VERSION; version--) {
+            Set<String> locationsForVersion = versionedLocations.get(version);
 
-        return IntStream.iterate(CURRENT_VERSION, version -> version > BASE_RELEASE_VERSION, version -> --version)
-                .mapToObj(version -> resource.getResource(META_INF_VERSIONS + version + "/" + location))
-                .filter(Objects::nonNull)
-                .findFirst()
-                .orElseGet(() -> resource.getResource(location));
+            if (locationsForVersion != null && locationsForVersion.contains(location)) {
+                return resource.getResource(META_INF_VERSIONS + version + "/" + location);
+            }
+        }
+        return resource.getResource(location);
     }
 
     @Override
