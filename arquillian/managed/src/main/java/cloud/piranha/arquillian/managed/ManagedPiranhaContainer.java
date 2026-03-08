@@ -30,8 +30,13 @@ package cloud.piranha.arquillian.managed;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import java.net.URL;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.file.Files;
+import java.time.Duration;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -91,6 +96,12 @@ public class ManagedPiranhaContainer implements DeployableContainer<ManagedPiran
      * Stores the Piranha process.
      */
     private Process process;
+
+    /**
+     * Stores the Piranha instance log file for the current deployment.
+     * Set during {@link #startPiranha} so it can be surfaced after undeploy.
+     */
+    private File logFile;
 
     /**
      * Default constructor.
@@ -191,6 +202,17 @@ public class ManagedPiranhaContainer implements DeployableContainer<ManagedPiran
                 LOGGER.log(WARNING, "Piranha did not shutdown within time alloted");
                 LOGGER.log(WARNING, "Destroying Piranha process forcibly");
                 process.destroyForcibly();
+            }
+        }
+
+        /*
+         * Log the Piranha instance output to help diagnose test failures.
+         */
+        if (logFile != null && logFile.exists()) {
+            try {
+                LOGGER.log(INFO, "Piranha log ({0}):\n{1}", logFile.getAbsolutePath(), Files.readString(logFile.toPath()));
+            } catch (IOException ioe) {
+                LOGGER.log(WARNING, "Could not read Piranha log file: {0}", ioe.getMessage());
             }
         }
 
@@ -417,7 +439,7 @@ public class ManagedPiranhaContainer implements DeployableContainer<ManagedPiran
 
         String appName = toAppName(warFile.getName());
         String appURL = "http://localhost:" + Integer.toString(configuration.getHttpPort()) + "/" + appName;
-        File logFile = new File(runtimeDirectory, appName + ".log");
+        logFile = new File(runtimeDirectory, appName + ".log");
 
         LOGGER.log(INFO,
             """
@@ -476,11 +498,38 @@ public class ManagedPiranhaContainer implements DeployableContainer<ManagedPiran
             LOGGER.log(WARNING, "Piranha terminated during startup.");
 
             String msg = "Cannot start Piranha. \n";
-            if (process.getErrorStream() != null) {
+            if (logFile.exists()) {
                 msg += Files.readString(logFile.toPath());
             }
 
             throw new DeploymentException(msg);
+        }
+
+        /*
+         * HTTP probe: if Piranha returns 503, the WAR failed to deploy.
+         * The response body carries the deployment exception message.
+         */
+        try {
+            HttpClient httpClient = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(5))
+                    .build();
+            HttpRequest probeRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(appURL))
+                    .timeout(Duration.ofSeconds(5))
+                    .GET()
+                    .build();
+            HttpResponse<String> probeResponse = httpClient.send(
+                    probeRequest, HttpResponse.BodyHandlers.ofString());
+            if (probeResponse.statusCode() == 503) {
+                throw new DeploymentException(probeResponse.body());
+            }
+        } catch (DeploymentException de) {
+            throw de;
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            LOGGER.log(WARNING, "HTTP probe interrupted");
+        } catch (Exception e) {
+            LOGGER.log(WARNING, "HTTP probe failed, proceeding: {0}", e.getMessage());
         }
 
         LOGGER.log(INFO,

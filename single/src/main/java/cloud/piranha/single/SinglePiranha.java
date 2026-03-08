@@ -32,6 +32,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.reflect.InvocationTargetException;
+import java.nio.charset.StandardCharsets;
 
 import cloud.piranha.core.api.Piranha;
 import cloud.piranha.core.api.PiranhaConfiguration;
@@ -45,6 +46,7 @@ import cloud.piranha.feature.impl.DefaultFeatureManager;
 import cloud.piranha.feature.logging.LoggingFeature;
 import cloud.piranha.feature.webapp.WebAppFeature;
 import cloud.piranha.http.api.HttpServer;
+import cloud.piranha.http.api.HttpServerProcessorEndState;
 
 import static java.lang.System.Logger.Level.ERROR;
 import static java.lang.System.Logger.Level.INFO;
@@ -140,6 +142,8 @@ public class SinglePiranha implements Piranha, Runnable {
         webAppFeature.start();
         featureManager.addFeature(webAppFeature);
 
+        Throwable deploymentError = webAppFeature.getDeploymentError();
+
         /*
          * Construct, initialize and start HTTP endpoint (if applicable).
          */
@@ -148,7 +152,26 @@ public class SinglePiranha implements Piranha, Runnable {
             httpFeature.setHttpServerClass(configuration.getString("httpServerClass"));
             httpFeature.setPort(configuration.getInteger("httpPort"));
             httpFeature.init();
-            httpFeature.getHttpServer().setHttpServerProcessor(webAppFeature.getHttpServerProcessor());
+            if (deploymentError != null) {
+                final String errorBody = deploymentError.toString();
+                httpFeature.getHttpServer().setHttpServerProcessor((request, response) -> {
+                    try {
+                        byte[] body = errorBody.getBytes(StandardCharsets.UTF_8);
+                        response.setStatus(503);
+                        response.setHeader("Content-Type", "text/plain;charset=UTF-8");
+                        response.setHeader("Content-Length", Integer.toString(body.length));
+                        response.writeStatusLine();
+                        response.writeHeaders();
+                        response.getOutputStream().write(body);
+                        response.getOutputStream().flush();
+                    } catch (IOException ioe) {
+                        LOGGER.log(WARNING, "Could not write 503 response", ioe);
+                    }
+                    return HttpServerProcessorEndState.COMPLETED;
+                });
+            } else {
+                httpFeature.getHttpServer().setHttpServerProcessor(webAppFeature.getHttpServerProcessor());
+            }
 
             /*
              * Enable Project CRaC.
@@ -186,7 +209,26 @@ public class SinglePiranha implements Piranha, Runnable {
             httpsFeature.setHttpsTruststorePassword(configuration.getString("httpsTruststorePassword"));
             httpsFeature.setPort(configuration.getInteger("httpsPort"));
             httpsFeature.init();
-            httpsFeature.getHttpsServer().setHttpServerProcessor(webAppFeature.getHttpServerProcessor());
+            if (deploymentError != null) {
+                final String errorBody = deploymentError.toString();
+                httpsFeature.getHttpsServer().setHttpServerProcessor((request, response) -> {
+                    try {
+                        byte[] body = errorBody.getBytes(StandardCharsets.UTF_8);
+                        response.setStatus(503);
+                        response.setHeader("Content-Type", "text/plain;charset=UTF-8");
+                        response.setHeader("Content-Length", Integer.toString(body.length));
+                        response.writeStatusLine();
+                        response.writeHeaders();
+                        response.getOutputStream().write(body);
+                        response.getOutputStream().flush();
+                    } catch (IOException ioe) {
+                        LOGGER.log(WARNING, "Could not write 503 response", ioe);
+                    }
+                    return HttpServerProcessorEndState.COMPLETED;
+                });
+            } else {
+                httpsFeature.getHttpsServer().setHttpServerProcessor(webAppFeature.getHttpServerProcessor());
+            }
 
             /*
              * Enable Project CRaC.

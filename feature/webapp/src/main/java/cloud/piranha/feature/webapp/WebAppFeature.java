@@ -27,6 +27,7 @@
  */
 package cloud.piranha.feature.webapp;
 
+import cloud.piranha.core.api.WebApplication;
 import cloud.piranha.core.api.WebApplicationExtension;
 import cloud.piranha.core.impl.DefaultModuleFinder;
 import cloud.piranha.core.impl.DefaultModuleLayerProcessor;
@@ -95,6 +96,11 @@ public class WebAppFeature extends DefaultFeature {
     private HttpWebApplicationServer httpWebApplicationServer;
 
     /**
+     * Stores the deployment error, if any.
+     */
+    private Throwable deploymentError;
+
+    /**
      * Constructor.
      */
     public WebAppFeature() {
@@ -116,6 +122,15 @@ public class WebAppFeature extends DefaultFeature {
      */
     public Class<? extends WebApplicationExtension> getExtensionClass() {
         return extensionClass;
+    }
+
+    /**
+     * Get the deployment error.
+     *
+     * @return the deployment error, or null if deployment succeeded.
+     */
+    public Throwable getDeploymentError() {
+        return deploymentError;
     }
 
     /**
@@ -202,12 +217,13 @@ public class WebAppFeature extends DefaultFeature {
                 contextPath = "/" + contextPath;
             }
             webApplication.setContextPath(contextPath);
-            httpWebApplicationServer.addWebApplication(webApplication);
-
-            try {
-                webApplication.initialize();
-            } catch (Throwable e) {
-                LOGGER.log(ERROR, "Failed to initialize web application");
+            webApplication.initialize();
+            if (webApplication.getStatus() == WebApplication.Status.ERROR) {
+                deploymentError = new RuntimeException(
+                    "Web application initialization failed (status=ERROR) at " + contextPath);
+                LOGGER.log(ERROR, "Failed to initialize web application at {0}", contextPath);
+            } else {
+                httpWebApplicationServer.addWebApplication(webApplication);
             }
         }
 

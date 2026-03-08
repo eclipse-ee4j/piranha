@@ -42,5 +42,6 @@ module cloud.piranha.arquillian.managed {
     requires arquillian.container.spi;
     requires arquillian.core.spi;
     requires free.port.finder;
+    requires java.net.http;
     requires shrinkwrap.api;
 }
