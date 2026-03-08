@@ -26,7 +26,7 @@ jobs:
     - name: Build with Maven
       run: mvn -B -ntp -T 1 install
   docs:
-    if: github.repository == 'eclipse-ee4j/piranha'
+    if: false # github.repository == 'eclipse-ee4j/piranha'
     runs-on: ubuntu-latest
     steps:
     - name: Checkout Piranha
@@ -56,7 +56,7 @@ jobs:
         git commit -a -m "Publishing SNAPSHOT documentation" || true
         git push
   ghcr:
-    if: github.repository == 'eclipse-ee4j/piranha'
+    if: false # github.repository == 'eclipse-ee4j/piranha'
     runs-on: ubuntu-latest
     steps:
     - name: Checkout sources
