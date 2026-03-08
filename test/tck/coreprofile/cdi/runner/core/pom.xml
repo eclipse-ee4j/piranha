@@ -13,7 +13,10 @@
     <artifactId>core</artifactId>
     <name>Piranha - Test - TCK - Core Profile - CDI TCK - Runner - Core</name>
     <properties>
-        <testng.version>7.11.0</testng.version>
+        <!-- Weld 6 CDI TCK integration: CDI TCK 4.1.0 was built against TestNG 7.9.0.
+             TestNG 7.10+ dropped EmailableReporter which is referenced in the TCK
+             suite XML, so we pin to 7.9.0. -->
+        <testng.version>7.9.0</testng.version>
     </properties>
     <dependencyManagement>
         <dependencies>

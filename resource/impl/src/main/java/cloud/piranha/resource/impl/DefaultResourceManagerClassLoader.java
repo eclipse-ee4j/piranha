@@ -254,9 +254,13 @@ public class DefaultResourceManagerClassLoader extends ClassLoader implements Re
     public Enumeration<URL> getResources(String name) throws IOException {
         // Assume for now amount of resources is reasonably small to afford allocating
         // new collections.
-        List<URL> resources = list(delegateClassLoader.getResources(name));
+        // Web application (child) resources come first so that WAR-bundled service
+        // providers (META-INF/services/) take precedence over those on the parent /
+        // system class loader — this is the child-first ordering required by the
+        // Jakarta EE specification for web applications.
+        List<URL> resources = list(findResources(name));
 
-        resources.addAll(list(findResources(name)));
+        resources.addAll(list(delegateClassLoader.getResources(name)));
 
         return enumeration(resources);
     }
