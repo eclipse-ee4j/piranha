@@ -48,6 +48,7 @@ import static java.lang.System.Logger.Level.WARNING;
 import java.util.ArrayList;
 import java.util.List;
 import static java.util.Objects.requireNonNull;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
@@ -131,6 +132,11 @@ public class DefaultAsyncContext implements AsyncContext {
     private ScheduledThreadPoolExecutor scheduledThreadPoolExecutor = new ScheduledThreadPoolExecutor(1);
 
     /**
+     * Stores the scheduled timeout future.
+     */
+    private ScheduledFuture<?> timeoutFuture;
+
+    /**
      * Constructor.
      *
      * @param asyncStartRequest the servlet asyncStartRequest.
@@ -143,7 +149,9 @@ public class DefaultAsyncContext implements AsyncContext {
         originalRequest = unwrapFully(asyncStartRequest);
         originalResponse = unwrapFully(asyncStartResponse);
 
-        scheduledThreadPoolExecutor.schedule(this::onTimeOut, timeout, MILLISECONDS);
+        if (timeout > 0) {
+            timeoutFuture = scheduledThreadPoolExecutor.schedule(this::onTimeOut, timeout, MILLISECONDS);
+        }
     }
 
     @Override
@@ -236,6 +244,27 @@ public class DefaultAsyncContext implements AsyncContext {
     }
 
     /**
+     * Process on error.
+     *
+     * @param throwable the throwable.
+     */
+    public void onError(Throwable throwable) {
+        scheduledThreadPoolExecutor.shutdownNow();
+
+        if (!listeners.isEmpty()) {
+            listeners.forEach(listener -> {
+                try {
+                    listener.onError(new AsyncEvent(this, throwable));
+                } catch (IOException ioe) {
+                    LOGGER.log(WARNING, () -> "IOException when calling onError on AsyncListener", ioe);
+                }
+            });
+        }
+
+        originalResponse.closeAsyncResponse();
+    }
+
+    /**
      * Process on timeout
      */
     public void onTimeOut() {
@@ -287,6 +316,13 @@ public class DefaultAsyncContext implements AsyncContext {
     @Override
     public void setTimeout(long timeout) {
         this.timeout = timeout;
+        if (timeoutFuture != null) {
+            timeoutFuture.cancel(false);
+            timeoutFuture = null;
+        }
+        if (timeout > 0) {
+            timeoutFuture = scheduledThreadPoolExecutor.schedule(this::onTimeOut, timeout, MILLISECONDS);
+        }
     }
 
     /**

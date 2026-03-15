@@ -177,7 +177,12 @@ public class GrizzlyHttpServer implements cloud.piranha.http.api.HttpServer {
                 HttpServerProcessorEndState state = httpServerProcessor.process(gRequest, gResponse);
                 LOGGER.log(TRACE, "service processor returned state={0} grizzly.isSuspended={1} grizzly.isCommitted={2}",
                         state, response.isSuspended(), response.isCommitted());
-                if (state == ASYNCED && !response.isCommitted()) {
+                if (state == ASYNCED) {
+                    // Note: we intentionally do NOT check !response.isCommitted() here.
+                    // SSE endpoints commit the response (flush headers/data) during the
+                    // request handler, before returning ASYNCED.  Skipping suspend for
+                    // committed responses would close the connection immediately, causing
+                    // SSE clients to auto-reconnect in a loop.
                     LOGGER.log(TRACE, "service state=ASYNCED calling response.suspend(60s) grizzly.isSuspended={0}",
                             response.isSuspended());
                     response.suspend(60, SECONDS, new CompletionHandler<Response>() {

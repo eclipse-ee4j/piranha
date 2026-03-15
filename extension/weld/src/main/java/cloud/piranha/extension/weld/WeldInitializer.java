@@ -63,7 +63,7 @@ public class WeldInitializer implements ServletContainerInitializer {
             servletContext.setInitParameter("org.jboss.weld.environment.servlet.emptyBeansXmlModeAll", "true");
         }
 
-        servletContext.setInitParameter("org.jboss.weld.environment.servlet.archive.isolation", "false");
+        servletContext.setInitParameter("org.jboss.weld.environment.servlet.archive.isolation", "true");
 
         WebApplication webApplication = (WebApplication) servletContext;
         WeldInitListener weldInitListener = webApplication.createListener(WeldInitListener.class);
