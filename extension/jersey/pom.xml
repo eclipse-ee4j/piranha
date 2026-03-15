@@ -78,6 +78,16 @@
             <artifactId>jersey-media-json-processing</artifactId>
             <scope>runtime</scope>
         </dependency>
+        <dependency>
+            <groupId>org.glassfish.jersey.media</groupId>
+            <artifactId>jersey-media-jaxb</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.glassfish.jersey.media</groupId>
+            <artifactId>jersey-media-multipart</artifactId>
+            <scope>runtime</scope>
+        </dependency>
         <dependency> 
             <groupId>org.glassfish.jersey.media</groupId> 
             <artifactId>jersey-media-sse</artifactId> 

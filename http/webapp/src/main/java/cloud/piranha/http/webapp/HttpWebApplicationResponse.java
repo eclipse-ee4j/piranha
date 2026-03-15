@@ -65,4 +65,10 @@ public class HttpWebApplicationResponse extends DefaultWebApplicationResponse {
             }
         });
     }
+    
+    @Override
+    public void setStatus(int status) {
+        super.setStatus(status);
+        wrapped.setStatus(status);
+    }
 }
