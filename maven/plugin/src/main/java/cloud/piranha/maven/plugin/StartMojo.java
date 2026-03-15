@@ -109,9 +109,13 @@ public class StartMojo extends BaseMojo {
         commands.add("--war-file");
         commands.add(warName + ".war");
         commands.add("--write-pid");
+        File logFile = new File(runtimeDirectory, "tmp/piranha.log");
+        logFile.getParentFile().mkdirs();
         new ProcessBuilder()
                 .directory(new File(runtimeDirectory))
                 .command(commands)
+                .redirectErrorStream(true)
+                .redirectOutput(logFile)
                 .start();
     }
 
@@ -140,9 +144,13 @@ public class StartMojo extends BaseMojo {
         }
         arguments.append(" --verbose --write-pid");
         commands.add(arguments.toString());
+        File logFile = new File(runtimeDirectory, "tmp/piranha.log");
+        logFile.getParentFile().mkdirs();
         new ProcessBuilder()
                 .directory(new File(runtimeDirectory + File.separator + "bin"))
                 .command(commands)
+                .redirectErrorStream(true)
+                .redirectOutput(logFile)
                 .start();
     }
 
