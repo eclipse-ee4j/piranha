@@ -127,6 +127,8 @@
                         <webServerPort>8080</webServerPort>
                         <user>j2ee</user>
                         <password>j2ee</password>
+                        <authuser>javajoe</authuser>
+                        <authpassword>javajoe</authpassword>
                     </systemPropertyVariables>
                 </configuration>
             </plugin>  

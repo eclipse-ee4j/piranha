@@ -172,7 +172,7 @@ public class ServletSecurityManager implements SecurityManager {
         }
 
         if (caller != null && caller.getCallerPrincipal() != null) {
-            setIdentityForCurrentRequest(request, caller.getCallerPrincipal(), caller.getGroups(), "authenticate");
+            setIdentityForCurrentRequest(request, caller.getCallerPrincipal(), caller.getGroups(), authMethod != null ? authMethod : "authenticate");
         }
 
         return caller != null;
@@ -311,7 +311,7 @@ public class ServletSecurityManager implements SecurityManager {
         if (resultIdentity == null) {
             throw new ServletException();
         }
-        setIdentityForCurrentRequest(request, resultIdentity.getCallerPrincipal(), resultIdentity.getGroups(), "login");
+        setIdentityForCurrentRequest(request, resultIdentity.getCallerPrincipal(), resultIdentity.getGroups(), authMethod != null ? authMethod : "login");
     }
 
     @Override
