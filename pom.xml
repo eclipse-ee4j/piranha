@@ -126,7 +126,7 @@
         <shrinkwrap-resolver.version>3.3.3</shrinkwrap-resolver.version>
         <soteria.version>4.0.2</soteria.version>
         <spring-boot.version>3.5.7</spring-boot.version>
-        <testcontainers.version>2.0.1</testcontainers.version>
+        <testcontainers.version>2.0.3</testcontainers.version>
         <transact-cdi-beans.version>1.0.1</transact-cdi-beans.version>
         <tyrus.version>2.2.0</tyrus.version>
         <undertow.version>2.3.21.Final</undertow.version>
@@ -172,6 +172,7 @@
         <versions-maven-plugin.version>2.20.1</versions-maven-plugin.version>
         <!-- other -->
         <java.version>21</java.version>
+        <enforced.java.version>[21,22)</enforced.java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
     <dependencyManagement>
@@ -884,7 +885,7 @@
                                     <version>3.8.7</version>
                                 </requireMavenVersion>
                                 <requireJavaVersion>
-                                    <version>${java.version}</version>
+                                    <version>${enforced.java.version}</version>
                                 </requireJavaVersion>
                             </rules>    
                         </configuration>

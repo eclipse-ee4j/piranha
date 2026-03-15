@@ -11,7 +11,7 @@ jobs:
       fail-fast: false
       matrix:
         distribution: [ 'temurin' ]
-        java: [ '23', '24-ea', '25-ea' ]
+        java: [ '25' ]
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
     - name: Checkout Sources
@@ -22,7 +22,7 @@ jobs:
         distribution: ${{ matrix.distribution }}
         java-version: ${{ matrix.java }}
     - name: Build with Maven
-      run: mvn -B -ntp -T 1 install
+      run: mvn -B -ntp -T 1 -Denforced.java.version=[21,26) install
   result:
     if: ${{ always() }} && github.repository == 'eclipse-ee4j/piranha'
     runs-on: ubuntu-latest

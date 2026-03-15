@@ -57,10 +57,16 @@ jobs:
         mvn -B -fae -ntp install
     - name: Test Summary
       uses: test-summary/action@v2
+      id: test_summary
       with:
         paths: |
           test/tck/coreprofile/cdi/runner/core/target/surefire-reports/junitreports/TEST-*.xml
           test/tck/coreprofile/cdi/runner/model/target/surefire-reports/TEST-*.xml
+        output: test-summary.md
+      if: always()
+    - name: Job Summary
+      run: |
+        echo "${{ steps.test_summary.outputs.passed }} out of ${{ steps.test_summary.outputs.total }} tests passed" >> $GITHUB_STEP_SUMMARY
       if: always()
   coreprofile:
     if: github.repository == 'eclipse-ee4j/piranha'
