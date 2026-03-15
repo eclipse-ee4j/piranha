@@ -93,6 +93,11 @@ public class DefaultWebApplicationOutputStream extends WebApplicationOutputStrea
     protected Lock writeListenerLock = new ReentrantLock();
 
     /**
+     * Stores the previous byte for SSE double-newline detection.
+     */
+    protected int previousByte = -1;
+
+    /**
      * Constructor.
      */
     public DefaultWebApplicationOutputStream() {
@@ -107,6 +112,9 @@ public class DefaultWebApplicationOutputStream extends WebApplicationOutputStrea
         }
         if (!response.isCommitted()) {
             response.flushBuffer();
+            outputStream.flush();
+        } else {
+            // Always flush remaining data on close
             outputStream.flush();
         }
         closed = true;
@@ -289,6 +297,27 @@ public class DefaultWebApplicationOutputStream extends WebApplicationOutputStrea
             }
 
             /*
+             * For SSE, bypass buffering entirely and write directly with immediate flush
+             */
+            if (isServerSentEvents()) {
+                if (index > 0) {
+                    // Flush any existing buffered data first
+                    outputStream.write(buffer, 0, index);
+                    index = 0;
+                }
+                outputStream.write(integer);
+                // Auto-flush after double newline (SSE event delimiter)
+                if (previousByte == '\n' && integer == '\n') {
+                    outputStream.flush();
+                    if (!response.isCommitted()) {
+                        response.setCommitted(true);
+                    }
+                }
+                previousByte = integer;
+                return;
+            }
+
+            /*
              * Servlet:SPEC:192.2
              *
              * If the integer we are looking at will cause the buffer to
@@ -320,12 +349,24 @@ public class DefaultWebApplicationOutputStream extends WebApplicationOutputStrea
                 this.buffer[index] = (byte) integer;
                 this.index++;
             }
+            previousByte = integer;
         } else {
             /*
              * WriteListener is set so write directly to output stream.
              */
             outputStream.write(integer);
+            previousByte = integer;
         }
+    }
+
+    /**
+     * Check if this response is for Server-Sent Events (SSE).
+     *
+     * @return true if the content type is text/event-stream, false otherwise.
+     */
+    private boolean isServerSentEvents() {
+        String contentType = response.getContentType();
+        return contentType != null && contentType.contains("text/event-stream");
     }
 
     /**
