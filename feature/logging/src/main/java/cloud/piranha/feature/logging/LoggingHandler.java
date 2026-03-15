@@ -27,14 +27,12 @@
  */
 package cloud.piranha.feature.logging;
 
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.logging.ConsoleHandler;
 import java.util.logging.Handler;
 import java.util.logging.LogRecord;
-import java.util.logging.ConsoleHandler;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.TimeUnit;
 
 /**
  * The LoggingHandler class.
@@ -44,14 +42,20 @@ import java.util.concurrent.TimeUnit;
 public class LoggingHandler extends Handler {
 
     /**
-     * Stores the executor service for handling log records.
-     */
-    private final ExecutorService executorService = Executors.newSingleThreadExecutor();
-
-    /**
      * Stores the original ConsoleHandler.
      */
     private final ConsoleHandler consoleHandler = new ConsoleHandler();
+
+    /**
+     * Single logging thread with a large backlog so callers never block.
+     * Records that overflow the backlog are silently discarded by CallerRunsPolicy
+     * rather than blocking the caller or throwing.
+     */
+    private final ThreadPoolExecutor executor = new ThreadPoolExecutor(
+            1, 1,
+            0L, TimeUnit.MILLISECONDS,
+            new ArrayBlockingQueue<>(10_000),
+            new ThreadPoolExecutor.DiscardPolicy());
 
     /**
      * Constructor.
@@ -62,49 +66,23 @@ public class LoggingHandler extends Handler {
 
     @Override
     public void publish(LogRecord record) {
-        executorService.submit(new LogRecordPublisher(record));
-    }
-
-    /**
-     * The LogRecordPublisher class.
-     */
-    private class LogRecordPublisher implements Runnable {
-
-        /**
-         * Stores the LogRecord.
-         */
-        private final LogRecord record;
-
-        /**
-         * Constructor.
-         * 
-         * @param record the log record.
-         */
-        LogRecordPublisher(LogRecord record) {
-            this.record = record;
-        }
-
-        @Override
-        public void run() {
-            Future<?> future = executorService.submit(() -> consoleHandler.publish(record));
-            try {
-                future.get(10, TimeUnit.SECONDS);
-            } catch (TimeoutException e) {
-                future.cancel(true);
-            } catch (Exception e) {
-                // Handle other exceptions
-            }
-        }
+        executor.execute(() -> consoleHandler.publish(record));
     }
 
     @Override
     public void flush() {
-        consoleHandler.flush();
+        // Drain the queue before flushing the underlying handler.
+        executor.submit(consoleHandler::flush);
     }
 
     @Override
     public void close() throws SecurityException {
+        executor.shutdown();
+        try {
+            executor.awaitTermination(1, TimeUnit.SECONDS);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+        }
         consoleHandler.close();
-        executorService.shutdown();
     }
 }

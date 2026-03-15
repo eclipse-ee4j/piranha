@@ -93,9 +93,14 @@ public class ManagedPiranhaContainer implements DeployableContainer<ManagedPiran
     private File localRepositoryDir = new File(System.getProperty("user.home"), ".m2/repository");
 
     /**
-     * Stores the Piranha process.
+     * Stores the Piranha process per deployment (keyed by app name).
      */
-    private Process process;
+    private final java.util.Map<String, Process> processes = new java.util.LinkedHashMap<>();
+
+    /**
+     * Stores the HTTP port per deployment (keyed by app name).
+     */
+    private final java.util.Map<String, Integer> deploymentPorts = new java.util.LinkedHashMap<>();
 
     /**
      * Stores the Piranha instance log file for the current deployment.
@@ -133,35 +138,51 @@ public class ManagedPiranhaContainer implements DeployableContainer<ManagedPiran
         ProtocolMetaData metadata = new ProtocolMetaData();
 
         try {
+            String warFileName = toWarFilename(archive);
+            String appName = toAppName(warFileName);
+
             /*
              * Export the Archive into a WAR file.
              */
-            String warFileName = toWarFilename(archive);
-
-            File runtimeDirectory = new File(System.getProperty(TMP_DIR), toAppName(warFileName));
+            File runtimeDirectory = new File(System.getProperty(TMP_DIR), appName);
             runtimeDirectory.mkdirs();
 
             File warFile = new File(runtimeDirectory, warFileName);
-
             archive.as(ZipExporter.class).exportTo(warFile, true);
 
             /*
-             * Copy runtime JAR into the runtime diectory.
+             * Copy runtime JAR into the runtime directory.
              */
             String version = determineVersionToUse();
             File piranhaJarFile = getPiranhaJarFile(version);
             copyPiranhaJarFile(runtimeDirectory, piranhaJarFile);
 
             /*
-             * Start Piranha.
+             * Use the configured port for the first deployment; fall back to a
+             * free port for any subsequent deployment so we do not kill the
+             * already-running Piranha process.
+             *
+             * Workaround for TCK locator test classes (e.g.
+             * ee.jakarta.tck.ws.rs.ee.rs.cookieparam.locator.JAXRSLocatorClientIT)
+             * that inherit a second @Deployment(testable=false) from their parent
+             * (e.g. JAXRSClientIT). Arquillian finds both @Deployment methods in
+             * the class hierarchy and deploys both WARs into the same container.
+             * The test only contacts the locator WAR on the configured port; the
+             * inherited WAR is dead weight and just needs to land somewhere.
              */
-            startPiranha(runtimeDirectory, warFile);
+            int port = deploymentPorts.containsValue(configuration.getHttpPort())
+                    ? me.alexpanov.net.FreePortFinder.findFreeLocalPort()
+                    : configuration.getHttpPort();
+            deploymentPorts.put(appName, port);
+            startPiranha(runtimeDirectory, warFile, port);
         } catch (IOException ioe) {
             ioe.printStackTrace();
             return null;
         }
 
-        HTTPContext httpContext = new HTTPContext("localhost", configuration.getHttpPort());
+        String appName = toAppName(toWarFilename(archive));
+        int port = deploymentPorts.getOrDefault(appName, configuration.getHttpPort());
+        HTTPContext httpContext = new HTTPContext("localhost", port);
         httpContext.add(new Servlet(
                 "ArquillianServletRunnerEE9",
                 archive.getName().substring(0, archive.getName().lastIndexOf("."))));
@@ -173,10 +194,16 @@ public class ManagedPiranhaContainer implements DeployableContainer<ManagedPiran
     public void undeploy(Archive<?> archive) throws DeploymentException {
         LOGGER.log(INFO, "Undeploying " + archive.getName());
 
+        String appName = toAppName(archive);
+        Process proc = processes.get(appName);
+        if (proc == null) {
+            return;
+        }
+
         /*
-         * Delete the PID file.
+         * Delete the PID file to trigger Piranha shutdown.
          */
-        File runtimeDirectory = new File(System.getProperty(TMP_DIR), toAppName(archive));
+        File runtimeDirectory = new File(System.getProperty(TMP_DIR), appName);
         File pidFile = new File(runtimeDirectory, PID_FILENAME);
         if (pidFile.exists()) {
             try {
@@ -187,23 +214,26 @@ public class ManagedPiranhaContainer implements DeployableContainer<ManagedPiran
         }
 
         /*
-         * Wait for 5 minutes at the most.
+         * Wait for the Piranha process to exit.
          */
-        if (process != null && process.isAlive()) {
+        if (proc.isAlive()) {
             try {
                 LOGGER.log(INFO, "Waiting for Piranha to be shutdown");
 
                 long startTime = System.currentTimeMillis();
-                process.waitFor(30, TimeUnit.SECONDS);
-                Long finishTime = System.currentTimeMillis();
+                proc.waitFor(30, TimeUnit.SECONDS);
+                long finishTime = System.currentTimeMillis();
 
                 LOGGER.log(INFO, "Piranha has shutdown\n It took {0} milliseconds", finishTime - startTime);
             } catch (InterruptedException ie) {
                 LOGGER.log(WARNING, "Piranha did not shutdown within time alloted");
                 LOGGER.log(WARNING, "Destroying Piranha process forcibly");
-                process.destroyForcibly();
+                proc.destroyForcibly();
             }
         }
+
+        processes.remove(appName);
+        deploymentPorts.remove(appName);
 
         /*
          * Log the Piranha instance output to help diagnose test failures.
@@ -374,9 +404,10 @@ public class ManagedPiranhaContainer implements DeployableContainer<ManagedPiran
      *
      * @param runtimeDirectory the runtime directory.
      * @param warFile the WAR filename.
+     * @param httpPort the HTTP port to use for this deployment.
      */
-    private void startPiranha(File runtimeDirectory, File warFile) throws IOException, DeploymentException {
-        killProcessOnPort(configuration.getHttpPort());
+    private void startPiranha(File runtimeDirectory, File warFile, int httpPort) throws IOException, DeploymentException {
+        killProcessOnPort(httpPort);
         File stalePidFile = new File(runtimeDirectory, PID_FILENAME);
         if (stalePidFile.exists()) {
             try {
@@ -432,14 +463,14 @@ public class ManagedPiranhaContainer implements DeployableContainer<ManagedPiran
             }
         }
         commands.add("--http-port");
-        commands.add(Integer.toString(configuration.getHttpPort()));
+        commands.add(Integer.toString(httpPort));
         commands.add("--war-file");
         commands.add(warFile.getName());
         commands.add("--write-pid");
 
         String appName = toAppName(warFile.getName());
-        String appURL = "http://localhost:" + Integer.toString(configuration.getHttpPort()) + "/" + appName;
-        logFile = new File(runtimeDirectory, appName + ".log");
+        String appURL = "http://localhost:" + Integer.toString(httpPort) + "/" + appName;
+        File logFile = new File(runtimeDirectory, appName + ".log");
 
         LOGGER.log(INFO,
             """
@@ -460,17 +491,18 @@ public class ManagedPiranhaContainer implements DeployableContainer<ManagedPiran
             logFile.getAbsolutePath(),
             appURL);
 
-        process = new ProcessBuilder()
+        Process proc = new ProcessBuilder()
                 .directory(runtimeDirectory)
                 .command(commands)
                 .redirectErrorStream(true)
                 .redirectOutput(logFile)
                 .start();
+        processes.put(appName, proc);
 
         File pidFile = new File(runtimeDirectory, PID_FILENAME);
         int count = 0;
         LOGGER.log(INFO, "Waiting for Piranha to be ready");
-        while (!pidFile.exists() && process.isAlive()) {
+        while (!pidFile.exists() && proc.isAlive()) {
             try {
                 Thread.sleep(100);
                 count++;
@@ -494,7 +526,7 @@ public class ManagedPiranhaContainer implements DeployableContainer<ManagedPiran
             }
         }
 
-        if (!process.isAlive()) {
+        if (!proc.isAlive()) {
             LOGGER.log(WARNING, "Piranha terminated during startup.");
 
             String msg = "Cannot start Piranha. \n";
