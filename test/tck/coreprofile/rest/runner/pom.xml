@@ -112,6 +112,10 @@
                     <dependenciesToScan>
                         <dependency>jakarta.ws.rs:jakarta-restful-ws-tck</dependency>
                     </dependenciesToScan>
+                    <excludes>
+                        <!-- SE Bootstrap tests require standalone JAX-RS server, not supported in servlet container -->
+                        <exclude>**/sebootstrap/**</exclude>
+                    </excludes>
                     <forkCount>1</forkCount>
                     <reuseForks>false</reuseForks>
                     <forkedProcessTimeoutInSeconds>600</forkedProcessTimeoutInSeconds>
