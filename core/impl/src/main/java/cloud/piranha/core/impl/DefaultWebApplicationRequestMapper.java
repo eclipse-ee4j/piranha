@@ -31,6 +31,8 @@ import cloud.piranha.core.api.FilterMapping;
 import cloud.piranha.core.api.WebApplicationRequestMapper;
 import jakarta.servlet.DispatcherType;
 import static jakarta.servlet.DispatcherType.REQUEST;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import static java.util.Arrays.stream;
 import java.util.Collection;
@@ -108,7 +110,14 @@ public class DefaultWebApplicationRequestMapper implements WebApplicationRequest
                     urlPattern = "/" + urlPattern;
                 }
 
-                servletMappings.put(urlPattern, servletName);
+                // URL-decode the pattern to handle @ApplicationPath with encoded characters.
+                // Per Servlet spec 12.2, patterns are literal path patterns, not URL-encoded strings.
+                // Incoming request URIs are decoded per HTTP spec, so patterns must also be decoded
+                // to match correctly.
+                // Fixes: ee.jakarta.tck.ws.rs.servlet3.rs.applicationpath.JAXRSClientIT#applicationPathAnnotationEncodedTest
+                // (where @ApplicationPath("ApplicationPath%21") must match requests to "/ApplicationPath!/Resource")
+                String decodedPattern = URLDecoder.decode(urlPattern, StandardCharsets.UTF_8);
+                servletMappings.put(decodedPattern, servletName);
             }
         }
 

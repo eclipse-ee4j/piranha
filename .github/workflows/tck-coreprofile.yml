@@ -59,8 +59,8 @@ jobs:
       uses: test-summary/action@v2
       with:
         paths: |
-          cdi/runner/core/target/surefire-reports/junitreports/TEST-*.xml
-          cdi/runner/model/target/surefire-reports/TEST-*.xml
+          test/tck/coreprofile/cdi/runner/core/target/surefire-reports/junitreports/TEST-*.xml
+          test/tck/coreprofile/cdi/runner/model/target/surefire-reports/TEST-*.xml
       if: always()
   coreprofile:
     if: github.repository == 'eclipse-ee4j/piranha'
