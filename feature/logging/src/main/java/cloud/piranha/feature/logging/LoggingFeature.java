@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2026 Contributors to the Eclipse Foundation.
  * Copyright (c) 2002-2025 Manorrock.com. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,7 +42,7 @@ import cloud.piranha.feature.impl.DefaultFeature;
  * @author Manfred Riem (mriem@manorrock.com)
  */
 public class LoggingFeature extends DefaultFeature {
-    
+
     /**
      * Stores the logger.
      */
@@ -70,12 +71,14 @@ public class LoggingFeature extends DefaultFeature {
     @Override
     public void init() {
         /*
-         * Remote the default console handler.
+         * Remove the default console handler.
          */
         Logger rootLogger = Logger.getLogger("");
         Handler[] handlers = rootLogger.getHandlers();
-        if (handlers[0] instanceof ConsoleHandler) {
-            rootLogger.removeHandler(handlers[0]);
+        for (Handler handler : handlers) {
+            if (handler instanceof ConsoleHandler) {
+                rootLogger.removeHandler(handler);
+            }
         }
 
         /*
