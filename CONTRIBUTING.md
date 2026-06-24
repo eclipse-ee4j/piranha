@@ -10,11 +10,20 @@ involvement you are aiming for. The following comes to mind:
 
 Which ever level you pick we welcome you!
 
-## Important notice
+## Eclipse Contributor Agreement
 
-Note if you file issues, answer questions and/or issue pull requests you agree
-that those contributions will be owned by Manorrock.com and that Manorrock.com 
-can use those contributions in any manner Manorrock.com so desires.
+Before your contribution can be accepted by the project team, contributors must
+electronically sign the Eclipse Contributor Agreement (ECA).
+
+* http://www.eclipse.org/legal/ECA.php
+
+Git commit records are required to take a specific form.
+The credentials of the actual author must be used to populate the Author field.
+The author credentials must specify the author’s actual (legal) name and email address.
+The email address used must match the email address that the Eclipse Foundation has on file for the author (case-sensitive).
+
+For more information, please see the Eclipse Committer Handbook:
+https://www.eclipse.org/projects/handbook/#resources-commit
 
 ## Building and testing Piranha locally
 

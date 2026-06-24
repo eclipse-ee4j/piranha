@@ -95,7 +95,7 @@ Create an empty directory to store your Maven project. Inside of that directory 
                     <jreleaser>
                         <project>
                             <description>${project.name}</description>
-                            <copyright>Manorrock.com</copyright>
+                            <copyright>Contributors to the Eclipse Foundation</copyright>
                         </project>
                         <assemble>
                             <jlink>
