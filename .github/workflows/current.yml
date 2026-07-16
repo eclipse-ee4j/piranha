@@ -69,7 +69,7 @@ jobs:
     - name: Build with Maven
       run: mvn -B -Dmaven.javadoc.skip=true -DskipTests=true -DskipITs=true -ntp -P '!test' verify
     - name: Login to GHCR
-      uses: docker/login-action@v3
+      uses: docker/login-action@v4
       with:
         registry: ghcr.io
         username: ${{ secrets.DOCKER_USERNAME }}
