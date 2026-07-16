@@ -808,9 +808,9 @@
                     <checkstyleRules>
                         <module name="Checker">
                             <property name="fileExtensions" value="java"/>
-                            <module name="Header">
+                            <module name="RegexpHeader">
                                 <property name="header"
-                                          value="/*\n * Copyright (c) 2002-2025 Manorrock.com. All Rights Reserved.\n *"/>
+                                          value="/\*\n \* Copyright \(c\) (2002-2025 Manorrock\.com\. All Rights Reserved\.|\d{4}([-,]\d{4})* Contributors to the Eclipse Foundation\.)"/>
                             </module>
                             <module name="SuppressWarningsFilter"/>
                             <module name="TreeWalker">
