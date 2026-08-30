@@ -30,6 +30,9 @@ package cloud.piranha.dist.isolated;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiFunction;
 import java.lang.System.Logger.Level;
 import java.lang.System.Logger;
 
@@ -78,12 +81,12 @@ public class IsolatedPiranha implements Piranha, Runnable {
      * Stores the configuration.
      */
     private final PiranhaConfiguration configuration;
-    
+
     /**
      * Stores the feature manager.
      */
     private FeatureManager featureManager;
-    
+
     /**
      * Stores the HTTP feature.
      */
@@ -113,7 +116,7 @@ public class IsolatedPiranha implements Piranha, Runnable {
     public PiranhaConfiguration getConfiguration() {
         return configuration;
     }
-    
+
     /**
      * Get the only instance.
      *
@@ -131,35 +134,136 @@ public class IsolatedPiranha implements Piranha, Runnable {
     public static void main(String[] arguments) {
         theOneAndOnlyInstance = new IsolatedPiranha();
         theOneAndOnlyInstance.configuration.setBoolean("exitOnStop", true);
-        theOneAndOnlyInstance.processArguments(arguments);
+        if (!theOneAndOnlyInstance.processArguments(arguments)) {
+            showHelp();
+            return;
+        }
         theOneAndOnlyInstance.run();
     }
+
+    /**
+     * Stores the result of applying an argument.
+     *
+     * @param <B> the target type.
+     * @param builder the updated target.
+     * @param advance the number of extra positions to advance i.
+     */
+    private record ArgumentResult<B>(B builder, int advance) {}
 
     /**
      * Process the arguments.
      *
      * @param arguments the arguments.
+     * @return false if --help was requested, true otherwise.
      */
-    private void processArguments(String[] arguments) {
+    private boolean processArguments(String[] arguments) {
         if (arguments != null) {
+            final AtomicInteger httpPort = new AtomicInteger(0);
+            final AtomicInteger httpsPort = new AtomicInteger(0);
             for (int i = 0; i < arguments.length; i++) {
-                if (arguments[i].equals("--http-port")) {
-                    configuration.setInteger("httpPort", Integer.valueOf(arguments[i + 1]));
+                if (arguments[i].equals("--help")) {
+                    return false;
                 }
-                if (arguments[i].equals("--http-server-class")) {
-                    configuration.setString("httpServerClass", arguments[i + 1]);
+
+                Optional<ArgumentResult<PiranhaConfiguration>> result;
+
+                result = applyArgumentWithValueIfPresent(arguments, i, "--http-port", configuration, (c, v) -> {
+                    int port = Integer.parseInt(v);
+                    httpPort.setPlain(port);
+                    c.setInteger("httpPort", port);
+                    return c;
+                });
+                if (result.isEmpty()) {
+                    result = applyArgumentWithValueIfPresent(arguments, i, "--https-port", configuration, (c, v) -> {
+                        int port = Integer.parseInt(v);
+                        httpsPort.setPlain(port);
+                        c.setInteger("httpsPort", port);
+                        return c;
+                    });
                 }
-                if (arguments[i].equals("--https-port")) {
-                    configuration.setInteger("httpsPort", Integer.valueOf(arguments[i + 1]));
+                if (result.isEmpty()) {
+                    result = applyArgumentWithValueIfPresent(arguments, i, "--http-server-class", configuration, (c, v) -> {
+                        c.setString("httpServerClass", v);
+                        return c;
+                    });
                 }
-                if (arguments[i].equals("--https-server-class")) {
-                    configuration.setString("httpsServerClass", arguments[i + 1]);
+                if (result.isEmpty()) {
+                    result = applyArgumentWithValueIfPresent(arguments, i, "--https-server-class", configuration, (c, v) -> {
+                        c.setString("httpsServerClass", v);
+                        return c;
+                    });
                 }
-                if (arguments[i].equals("--logging-level")) {
-                    configuration.setString("loggingLevel", arguments[i + 1]);
+                if (result.isEmpty()) {
+                    result = applyArgumentWithValueIfPresent(arguments, i, "--logging-level", configuration, (c, v) -> {
+                        c.setString("loggingLevel", v);
+                        return c;
+                    });
+                }
+
+                if (result.isPresent()) {
+                    i += result.get().advance();
                 }
             }
+            checkPorts(httpPort.getPlain(), httpsPort.getPlain());
         }
+        return true;
+    }
+
+    /**
+     * Show help.
+     */
+    private static void showHelp() {
+        LOGGER.log(Level.INFO, "");
+        LOGGER.log(Level.INFO,
+                """
+  --help                                          - Show this help
+  --http-port <integer>                           - Set the HTTP port
+  --http-port=<integer>
+  --http-server-class <className>                 - Set the HTTP server class to use
+  --http-server-class=<className>
+  --https-port <integer>                          - Set the HTTPS port (disabled by default)
+  --https-port=<integer>
+  --https-server-class <className>                - Set the HTTPS server class to use
+  --https-server-class=<className>
+  --logging-level <string>                        - Set the java.util.logging.Level
+  --logging-level=<string>
+                """);
+    }
+
+    /**
+     * Check the HTTP and HTTPS port.
+     *
+     * @param httpPort the HTTP port.
+     * @param httpsPort the HTTPS port.
+     */
+    private void checkPorts(int httpPort, int httpsPort) {
+        if (httpsPort != 0 && httpPort == httpsPort) {
+            LOGGER.log(WARNING, "The http and the https ports are the same. Please use different ports");
+            System.exit(-1);
+        }
+    }
+
+    /**
+     * Apply an argument with a value to the target, supporting both "--key value" and "--key=value" forms.
+     *
+     * @param <B> the target type.
+     * @param arguments the arguments.
+     * @param i the current index.
+     * @param key the argument key.
+     * @param target the target object.
+     * @param action the action to apply.
+     * @return the result, or empty if the key does not match.
+     */
+    private static <B> Optional<ArgumentResult<B>> applyArgumentWithValueIfPresent(
+            String[] arguments, int i, String key, B target, BiFunction<B, String, B> action) {
+        if (arguments[i].equals(key)) {
+            return Optional.of(new ArgumentResult<>(action.apply(target, arguments[i + 1]), 1));
+        }
+        String prefix = key + "=";
+        if (arguments[i].startsWith(prefix)) {
+            return Optional.of(new ArgumentResult<>(action.apply(target, arguments[i].substring(prefix.length())), 0));
+        }
+        return Optional.empty();
     }
 
     /**
@@ -168,13 +272,13 @@ public class IsolatedPiranha implements Piranha, Runnable {
     @Override
     public void run() {
         long startTime = System.currentTimeMillis();
-        
+
         LoggingFeature loggingFeature = new LoggingFeature();
         featureManager.addFeature(loggingFeature);
         loggingFeature.setLevel(configuration.getString("loggingLevel"));
         loggingFeature.init();
         loggingFeature.start();
-        
+
         LOGGER.log(INFO, () -> "Starting Piranha");
 
         webApplicationServer = new HttpWebApplicationServer();
@@ -232,7 +336,7 @@ public class IsolatedPiranha implements Piranha, Runnable {
                 httpServer = httpsFeature.getHttpsServer();
             }
         }
-        
+
         if (configuration.getBoolean("exitOnStop", false)) {
             ExitOnStopFeature exitOnStopFeature = new ExitOnStopFeature();
             featureManager.addFeature(exitOnStopFeature);
@@ -270,7 +374,7 @@ public class IsolatedPiranha implements Piranha, Runnable {
         finishTime = System.currentTimeMillis();
         LOGGER.log(INFO, "Stopped Piranha");
         LOGGER.log(INFO, "We ran for {0} milliseconds", finishTime - startTime);
-        
+
         featureManager.stop();
     }
 

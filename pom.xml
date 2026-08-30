@@ -76,7 +76,7 @@
         <!-- dependencies -->
         <angus.activation.version>2.0.3</angus.activation.version>
         <angus.mail.version>2.0.5</angus.mail.version>
-        <arquillian.version>1.9.5.Final</arquillian.version>
+        <arquillian.version>1.10.2.Final</arquillian.version>
         <arquillian-jakarta.version>10.0.0.Final</arquillian-jakarta.version>
         <bcel.version>6.11.0</bcel.version>
         <checkstyle.version>10.21.4</checkstyle.version>
@@ -92,7 +92,7 @@
         <glassfish-client-ee11.version>1.8</glassfish-client-ee11.version>
         <grizzly.version>4.1.0-M1</grizzly.version>
         <grizzly-npn-api.version>2.0.0</grizzly-npn-api.version>
-        <guava.version>33.4.8-jre</guava.version>
+        <guava.version>33.6.0-jre</guava.version>
         <h2.version>2.4.240</h2.version>
         <!-- kept at 5.4.0 because 5.5.0 adds remote repositories. Only update WITH permission! -->
         <hazelcast.version>5.4.0</hazelcast.version>
@@ -108,13 +108,13 @@
         <junit-platform-launcher.version>1.11.4</junit-platform-launcher.version>
         <junit.version>5.11.4</junit.version>
         <maven-plugin-annotations.version>3.15.2</maven-plugin-annotations.version>
-        <maven-plugin-api.version>3.9.14</maven-plugin-api.version>
+        <maven-plugin-api.version>3.9.16</maven-plugin-api.version>
         <maven-plugin-tools-annotations.version>3.15.1</maven-plugin-tools-annotations.version>
         <microprofile-config-api.version>3.1</microprofile-config-api.version>
         <microprofile-jwt-auth-api.version>2.1</microprofile-jwt-auth-api.version>
         <microprofile-jwt-auth.version>3.0.1</microprofile-jwt-auth.version>
-        <mojarra.version>4.1.6</mojarra.version>
-        <netty.version>4.2.8.Final</netty.version>
+        <mojarra.version>4.1.9</mojarra.version>
+        <netty.version>4.2.12.Final</netty.version>
         <nimbus-jose-jwt.version>10.5</nimbus-jose-jwt.version>
         <omni-mp-config.version>3.0.0</omni-mp-config.version>
         <omnibeans.version>0.3</omnibeans.version>
@@ -129,7 +129,7 @@
         <testcontainers.version>2.0.3</testcontainers.version>
         <transact-cdi-beans.version>1.0.1</transact-cdi-beans.version>
         <tyrus.version>2.2.2</tyrus.version>
-        <undertow.version>2.3.23.Final</undertow.version>
+        <undertow.version>2.3.24.Final</undertow.version>
         <wasp.version>4.0.0</wasp.version>
         <weld.version>6.0.4.Final</weld.version>
         <yasson.version>3.0.4</yasson.version>
@@ -152,13 +152,13 @@
         <maven-failsafe-plugin.version>3.5.3</maven-failsafe-plugin.version>
         <maven-gpg-plugin.version>3.2.8</maven-gpg-plugin.version>
         <maven-install-plugin.version>3.1.4</maven-install-plugin.version>
-        <maven-invoker-plugin.version>3.9.1</maven-invoker-plugin.version>
+        <maven-invoker-plugin.version>3.10.1</maven-invoker-plugin.version>
         <maven-jar-plugin.version>3.4.2</maven-jar-plugin.version>
         <maven-javadoc-plugin.version>3.11.3</maven-javadoc-plugin.version>
-        <maven-plugin-plugin.version>3.15.1</maven-plugin-plugin.version>
+        <maven-plugin-plugin.version>3.15.2</maven-plugin-plugin.version>
         <maven-plugin-report-plugin.version>3.15.2</maven-plugin-report-plugin.version>
         <maven-replacer-plugin.version>1.5.3</maven-replacer-plugin.version>
-        <maven-resources-plugin.version>3.3.1</maven-resources-plugin.version>
+        <maven-resources-plugin.version>3.5.0</maven-resources-plugin.version>
         <maven-shade-plugin.version>3.6.1</maven-shade-plugin.version>
         <maven-site-plugin.version>3.21.0</maven-site-plugin.version>
         <maven-source-plugin.version>3.4.0</maven-source-plugin.version>
@@ -808,9 +808,9 @@
                     <checkstyleRules>
                         <module name="Checker">
                             <property name="fileExtensions" value="java"/>
-                            <module name="Header">
+                            <module name="RegexpHeader">
                                 <property name="header"
-                                          value="/*\n * Copyright (c) 2002-2025 Manorrock.com. All Rights Reserved.\n *"/>
+                                          value="/\*\n \* Copyright \(c\) (2002-2025 Manorrock\.com\. All Rights Reserved\.|\d{4}([-,]\d{4})* Contributors to the Eclipse Foundation\.)"/>
                             </module>
                             <module name="SuppressWarningsFilter"/>
                             <module name="TreeWalker">
